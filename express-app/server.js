@@ -323,61 +323,75 @@ app.get("/oauth/authorize", (req, res) => {
   `);
 });
 
-// OAuth Authorization POST handler
-app.post("/oauth/authorize", async (req, res) => {
-  const { email, password, client_id, redirect_uri, response_type, state, scope } = req.body;
+// OAuth Authorization POST handler - using PassportJS authentication
+app.post("/oauth/authorize", (req, res, next) => {
+  const { client_id, redirect_uri, response_type, state, scope } = req.body;
 
-  // Authenticate user
-  const user = users.find((u) => u.email === email);
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.redirect(`${redirect_uri}?error=access_denied&state=${state}`);
-  }
-
-  try {
-    // Find the client
-    const client = clients.find((c) => c.id === client_id);
-    if (!client) {
-      throw new Error('Client not found');
+  // Use Passport LocalStrategy to authenticate user
+  passport.authenticate('local', async (err, user, info) => {
+    if (err) {
+      console.error("Authentication error:", err);
+      let errorUrl = redirect_uri
+        .replace("dex:5556", "localhost:5556")
+        .replace("host.docker.internal:5556", "localhost:5556");
+      return res.redirect(`${errorUrl}?error=server_error&state=${state}`);
     }
 
-    // Generate authorization code
-    const authorizationCode = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    if (!user) {
+      // Authentication failed
+      console.log("Authentication failed:", info);
+      let errorUrl = redirect_uri
+        .replace("dex:5556", "localhost:5556")
+        .replace("host.docker.internal:5556", "localhost:5556");
+      return res.redirect(`${errorUrl}?error=access_denied&state=${state}`);
+    }
 
-    // Convert scope string to array if needed
-    const scopeArray = typeof scope === 'string' ? scope.split(' ') : scope;
+    try {
+      // Find the client
+      const client = clients.find((c) => c.id === client_id);
+      if (!client) {
+        throw new Error('Client not found');
+      }
 
-    // Save the authorization code using the model
-    const codeObject = {
-      authorizationCode,
-      expiresAt,
-      redirectUri: redirect_uri,
-      scope: scopeArray,
-    };
+      // Generate authorization code
+      const authorizationCode = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    await model.saveAuthorizationCode(codeObject, client, user);
+      // Convert scope string to array if needed
+      const scopeArray = typeof scope === 'string' ? scope.split(' ') : scope;
 
-    console.log('Authorization code generated:', authorizationCode);
-    console.log('Stored codes:', codes);
+      // Save the authorization code using the model
+      const codeObject = {
+        authorizationCode,
+        expiresAt,
+        redirectUri: redirect_uri,
+        scope: scopeArray,
+      };
 
-    // IMPORTANT: Convert Docker internal URLs to localhost for browser redirect
-    let callbackUrl = redirect_uri
-      .replace("dex:5556", "localhost:5556")
-      .replace("host.docker.internal:5556", "localhost:5556");
+      await model.saveAuthorizationCode(codeObject, client, user);
 
-    // Redirect with authorization code
-    res.redirect(
-      `${callbackUrl}?code=${authorizationCode}&state=${state}`,
-    );
-  } catch (err) {
-    console.error("OAuth authorize error:", err);
+      console.log('Authorization code generated:', authorizationCode);
+      console.log('Stored codes:', codes);
 
-    // Same URL conversion for errors
-    let errorUrl = redirect_uri
-      .replace("dex:5556", "localhost:5556")
-      .replace("host.docker.internal:5556", "localhost:5556");
-    res.redirect(`${errorUrl}?error=server_error&state=${state}`);
-  }
+      // IMPORTANT: Convert Docker internal URLs to localhost for browser redirect
+      let callbackUrl = redirect_uri
+        .replace("dex:5556", "localhost:5556")
+        .replace("host.docker.internal:5556", "localhost:5556");
+
+      // Redirect with authorization code
+      res.redirect(
+        `${callbackUrl}?code=${authorizationCode}&state=${state}`,
+      );
+    } catch (err) {
+      console.error("OAuth authorize error:", err);
+
+      // Same URL conversion for errors
+      let errorUrl = redirect_uri
+        .replace("dex:5556", "localhost:5556")
+        .replace("host.docker.internal:5556", "localhost:5556");
+      res.redirect(`${errorUrl}?error=server_error&state=${state}`);
+    }
+  })(req, res, next);
 });
 
 // Token endpoint - custom handler to include id_token

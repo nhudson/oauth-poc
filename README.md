@@ -1,6 +1,6 @@
 # OAuth/OIDC Integration POC
 
-This proof-of-concept demonstrates OAuth 2.0 / OIDC authentication flow between a legacy Express/PassportJS application and a modern Next.js application using Dex as an identity broker.
+This proof-of-concept demonstrates OAuth 2.0 / OIDC authentication flow between an Express/PassportJS application and a Next.js application using Dex as an identity broker.
 
 ## Architecture
 
@@ -34,6 +34,7 @@ docker-compose up --build
 ```
 
 Services will start in this order:
+
 1. Express app (immediate)
 2. Dex (15 second delay)
 3. Next.js app (20 second delay)
@@ -73,6 +74,7 @@ docker-compose down
 ## Troubleshooting
 
 If authentication fails:
+
 1. Verify all containers are running: `docker ps`
 2. Check logs: `docker-compose logs`
 3. Ensure `host.docker.internal` is in your `/etc/hosts` file
