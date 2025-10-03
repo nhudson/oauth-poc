@@ -1,0 +1,31 @@
+issuer: http://host.docker.internal:5556/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+  allowedOrigins: ["*"]
+staticClients:
+  - id: nextjs-app
+    name: "Next.js Application"
+    secret: nextjs-secret-key
+    redirectURIs:
+      - "http://localhost:3000/api/auth/callback/dex"
+connectors:
+  - type: oidc
+    id: legacy-passport-app
+    name: "Company Login (Legacy System)"
+    config:
+      issuer: http://host.docker.internal:4000
+      clientID: dex-client
+      clientSecret: dex-secret-key
+      redirectURI: http://host.docker.internal:5556/dex/callback
+      insecureSkipEmailVerified: true
+      insecureEnableGroups: true
+      getUserInfo: true
+      scopes:
+        - openid
+        - email
+        - profile
+logger:
+  level: "debug"
+  format: "text"

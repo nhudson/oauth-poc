@@ -1,0 +1,38 @@
+services:
+  express-app:
+    build: ./express-app
+    container_name: express-oauth-server
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+  dex:
+    image: ghcr.io/dexidp/dex:v2.44.0
+    container_name: dex-server
+    ports:
+      - "5556:5556"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./dex/config.yaml:/etc/dex/config.yaml
+    command: sh -c "echo 'Waiting for Express app to start...' && sleep 15 && dex serve /etc/dex/config.yaml"
+    depends_on:
+      - express-app
+  nextjs-app:
+    build: ./nextjs-app
+    container_name: nextjs-oauth-app
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-secret-key-change-in-production
+      - DEX_CLIENT_ID=nextjs-app
+      - DEX_CLIENT_SECRET=nextjs-secret-key
+      - DEX_ISSUER=http://host.docker.internal:5556/dex
+      - PORT=3000
+    depends_on:
+      - dex
+    command: sh -c "sleep 20 && npm run dev"
